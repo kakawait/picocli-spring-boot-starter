@@ -1,5 +1,8 @@
 # Spring boot Picocli starter
 
+[![Maven Central](https://img.shields.io/maven-central/v/com.kakawait/picocli-spring-boot-starter.svg)](https://search.maven.org/#artifactdetails%7Ccom.kakawait%7Cpicocli-spring-boot-starter%7C0.1.0%7Cjar)
+[![license](https://img.shields.io/github/license/kakawait/picocli-spring-boot-starter.svg)](https://github.com/kakawait/picocli-spring-boot-starter/blob/master/LICENSE.md)
+
 > A Spring boot starter for [Picocli](http://picocli.info/) command line tools. That let you easily write CLI for Spring boot application!
 
 ## Features
