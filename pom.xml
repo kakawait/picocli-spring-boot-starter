@@ -34,6 +34,10 @@
         <developerConnection>scm:git:git@github.com:kakawait/picocli-spring-boot-starter.git</developerConnection>
     </scm>
 
+    <properties>
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
+
     <modules>
         <module>picocli-spring-boot-starter</module>
         <module>picocli-spring-boot-autoconfigure</module>
