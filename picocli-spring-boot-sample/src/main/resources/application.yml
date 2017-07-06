@@ -1,0 +1,7 @@
+spring:
+  main:
+    web-environment: false
+logging:
+  level:
+    ROOT: off
+    org.flywaydb: info
