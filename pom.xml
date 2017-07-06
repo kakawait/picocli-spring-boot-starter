@@ -9,7 +9,7 @@
     <packaging>pom</packaging>
     <version>0.1.0</version>
 
-    <name>Picocli spring boot starter</name>
+    <name>Picocli spring boot starter parent</name>
     <description>Spring boot starter for Picocli command line parser that will simplify your CommandLineRunner</description>
     <url>https://github.com/kakawait/picocli-spring-boot-starter</url>
 
