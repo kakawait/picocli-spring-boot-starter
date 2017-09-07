@@ -1,13 +1,24 @@
 package com.kakawait.spring.boot.picocli.autoconfigure;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.AutoConfigureAfter;
+import org.springframework.boot.autoconfigure.condition.ConditionMessage;
+import org.springframework.boot.autoconfigure.condition.ConditionOutcome;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.SpringBootCondition;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ConditionContext;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ConfigurationCondition;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.type.AnnotatedTypeMetadata;
 import org.springframework.util.ReflectionUtils;
 import picocli.CommandLine;
 
@@ -32,20 +43,28 @@ class PicocliAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(PicocliCommandLineRunner.class)
+    @ConditionalOnBean(CommandLine.class)
     CommandLineRunner picocliCommandLineRunner(CommandLine cli) {
         return new PicocliCommandLineRunner(cli);
     }
 
     @ConditionalOnMissingBean(CommandLine.class)
+    @Conditional(CommandCondition.class)
     static class CommandlineConfiguration {
+
+        private final Logger logger = LoggerFactory.getLogger(CommandlineConfiguration.class);
 
         @Bean
         CommandLine picocliCommandLine(ApplicationContext applicationContext) {
             Collection<Object> commands = applicationContext.getBeansWithAnnotation(Command.class).values();
-            Object main = getMainCommand(commands);
-            commands.remove(main);
+            List<Object> mainCommands = getMainCommands(commands);
+            Object mainCommand = mainCommands.isEmpty() ? new HelpAwarePicocliCommand() {} : mainCommands.get(0);
+            if (mainCommands.size() > 1) {
+                logger.warn("Multiple mains command founds [{}], selected first one {}", mainCommands, mainCommand);
+            }
+            commands.removeAll(mainCommands);
 
-            CommandLine cli = new CommandLine(main);
+            CommandLine cli = new CommandLine(mainCommand);
             registerCommands(cli, commands);
 
             applicationContext.getBeansOfType(PicocliConfigurer.class).values().forEach(c -> c.configure(cli));
@@ -84,22 +103,18 @@ class PicocliAutoConfiguration {
             return Optional.of(parentClass);
         }
 
-        private Object getMainCommand(Collection<Object> candidates) {
-            Object mainCommand = null;
+        private List<Object> getMainCommands(Collection<Object> candidates) {
+            List<Object> mainCommands = new ArrayList<>();
             for (Object candidate : candidates) {
                 Class<?> clazz = AopUtils.getTargetClass(candidate);
                 Method method = ReflectionUtils.findMethod(Command.class, "name");
                 if (clazz.isAnnotationPresent(Command.class)
                         && method != null
                         && clazz.getAnnotation(Command.class).name().equals(method.getDefaultValue())) {
-                    mainCommand = candidate;
-                    break;
+                    mainCommands.add(candidate);
                 }
             }
-            if (mainCommand == null) {
-                mainCommand = new PicocliCommand() {};
-            }
-            return mainCommand;
+            return mainCommands;
         }
 
         private Map<Node, List<Object>> findCommands(Collection<Object> commands) {
@@ -109,13 +124,7 @@ class PicocliAutoConfiguration {
                     .sorted((o1, o2) -> {
                         int l1 = getNestedLevel(AopUtils.getTargetClass(o1));
                         int l2 = getNestedLevel(AopUtils.getTargetClass(o2));
-                        if (l1 > l2) {
-                            return 1;
-                        } else if (l1 < l2) {
-                            return -1;
-                        } else {
-                            return 0;
-                        }
+                        return Integer.compare(l1, l2);
                     })
                     .forEach(o -> {
                         Class<?> clazz = AopUtils.getTargetClass(o);
@@ -137,6 +146,11 @@ class PicocliAutoConfiguration {
             Map<Class<?>, CommandLine> parents = new HashMap<>();
             for (Map.Entry<Node, List<Object>> entry : findCommands(commands).entrySet()) {
                 Node node = entry.getKey();
+                // Avoid parent "adopting" orphan node (I know is hard for orphan children but life is hard)
+                if (node.getParent() != null && !node.getParent().equals(current.getCommand().getClass())) {
+                    logger.warn("Orphan command may be detected {}, skipped!", node.getObject());
+                    continue;
+                }
                 List<Object> children = entry.getValue();
                 Object command = node.getObject();
                 String commandName = getCommandName(node.getClazz());
@@ -198,15 +212,25 @@ class PicocliAutoConfiguration {
             public int hashCode() {
                 return clazz != null ? clazz.hashCode() : 0;
             }
+        }
+    }
 
-            @Override
-            public String toString() {
-                StringBuffer sb = new StringBuffer("Node{");
-                sb.append("clazz=").append(clazz);
-                sb.append(", parent=").append(parent);
-                sb.append('}');
-                return sb.toString();
+    static class CommandCondition extends SpringBootCondition implements ConfigurationCondition {
+
+        @Override
+        public ConditionOutcome getMatchOutcome(ConditionContext context, AnnotatedTypeMetadata metadata) {
+            String[] commands = context.getBeanFactory().getBeanNamesForAnnotation(Command.class);
+            ConditionMessage.Builder message = ConditionMessage.forCondition("@Command Condition");
+            if (commands.length == 0) {
+                return ConditionOutcome.noMatch(message.didNotFind("@Command beans").atAll());
+            } else {
+                return ConditionOutcome.match(message.found("@Command beans").items((Object[]) commands));
             }
+        }
+
+        @Override
+        public ConfigurationPhase getConfigurationPhase() {
+            return ConfigurationPhase.REGISTER_BEAN;
         }
     }
 }
