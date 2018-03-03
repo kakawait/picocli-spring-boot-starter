@@ -1,6 +1,7 @@
 # Spring boot Picocli starter
 
 [![Travis](https://img.shields.io/travis/kakawait/picocli-spring-boot-starter.svg)](https://travis-ci.org/kakawait/picocli-spring-boot-starter)
+[![SonarQube Coverage](https://img.shields.io/sonar/https/sonarcloud.io/com.kakawait%3Apicocli-spring-boot-starter-parent/coverage.svg)](https://sonarcloud.io/component_measures?id=com.kakawait%3Apicocli-spring-boot-starter-parent&metric=coverage)
 [![Maven Central](https://img.shields.io/maven-central/v/com.kakawait/picocli-spring-boot-starter.svg)](https://search.maven.org/#artifactdetails%7Ccom.kakawait%7Cpicocli-spring-boot-starter%7C0.1.0%7Cjar)
 [![license](https://img.shields.io/github/license/kakawait/picocli-spring-boot-starter.svg)](https://github.com/kakawait/picocli-spring-boot-starter/blob/master/LICENSE.md)
 
