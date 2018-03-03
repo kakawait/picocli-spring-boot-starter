@@ -61,7 +61,7 @@ public class PicocliCommandLineRunner implements CommandLineRunner {
                 picocliCommand.setContext(commandLine);
                 picocliCommand.setRootContext(cli);
                 picocliCommand.setParsedCommands(commands);
-                picocliCommand.call();
+                result = picocliCommand.call();
             } else if (command instanceof Runnable) {
                 ((Runnable) command).run();
             } else if (command instanceof Callable) {
@@ -75,6 +75,10 @@ public class PicocliCommandLineRunner implements CommandLineRunner {
                 break;
             }
         }
+    }
+
+    public CommandLine getCommandLine() {
+        return cli;
     }
 
     private boolean isHelpRequested(CommandLine commandLine) {
