@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.kakawait</groupId>
     <artifactId>picocli-spring-boot-starter</artifactId>
-    <version>0.2.0</version>
+    <version>1.0.0-alpha-1</version>
     <packaging>jar</packaging>
 
     <name>Picocli spring boot starter</name>
@@ -90,7 +90,7 @@
         <profile>
             <id>release</id>
             <properties>
-                <gpg.executable>gpg2</gpg.executable>
+                <gpg.executable>gpg</gpg.executable>
             </properties>
             <build>
                 <plugins>

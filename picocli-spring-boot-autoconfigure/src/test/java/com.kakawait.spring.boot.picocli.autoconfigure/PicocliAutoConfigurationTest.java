@@ -58,7 +58,8 @@ public class PicocliAutoConfigurationTest {
         load(SimpleConfiguration.class);
         PicocliCommandLineRunner runner = context.getBean(PicocliCommandLineRunner.class);
 
-        assertThat(runner.getCommandLine().getCommand()).isInstanceOf(HelpAwarePicocliCommand.class);
+        Object command = runner.getCommandLine().getCommand();
+        assertThat(command).isInstanceOf(HelpAwarePicocliCommand.class);
 
         runner.run("-h");
 
@@ -74,7 +75,7 @@ public class PicocliAutoConfigurationTest {
 
         assertThat(runner.getCommandLine().getSubcommands().values())
                 .hasSameSizeAs(commands)
-                .extracting("interpreter.command")
+                .extractingResultOf("getCommand")
                 .containsExactlyElementsOf(commands)
                 .doNotHave(new Condition<>(SimpleConfiguration.NoBeanCommand.class::isInstance, "NoBeanCommand"));
     }

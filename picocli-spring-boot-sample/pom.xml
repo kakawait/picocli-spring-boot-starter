@@ -6,7 +6,7 @@
 
     <groupId>com.kakawait</groupId>
     <artifactId>picocli-spring-boot-sample</artifactId>
-    <version>0.2.0</version>
+    <version>1.0.0-alpha-1</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -21,7 +21,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>1.5.4.RELEASE</version>
+        <version>1.5.12.RELEASE</version>
         <relativePath/>
     </parent>
 
