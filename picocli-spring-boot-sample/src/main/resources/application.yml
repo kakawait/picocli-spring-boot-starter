@@ -1,6 +1,6 @@
 spring:
   main:
-    web-environment: false
+    web-application-type: none
 logging:
   level:
     ROOT: off

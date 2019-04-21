@@ -5,14 +5,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.matchesPattern;
 
 import java.util.Collection;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 
 import org.assertj.core.api.Condition;
-import org.assertj.core.api.iterable.Extractor;
 import org.junit.After;
 import org.junit.Rule;
 import org.junit.Test;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.rule.OutputCapture;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -87,12 +88,12 @@ public class PicocliAutoConfigurationTest {
         PicocliCommandLineRunner runner = context.getBean(PicocliCommandLineRunner.class);
         Collection<Object> commands = context.getBeansWithAnnotation(Command.class).values();
 
-        Extractor<CommandLine, Collection<CommandLine>> extractor = input -> input.getSubcommands().values();
+        Function<CommandLine, Collection<CommandLine>> extractor = input -> input.getSubcommands().values();
         assertThat(commands).hasSize(5);
-        
+
         CommandLine current = runner.getCommandLine();
         this.logCommandTree(current);
-        
+
         assertThat(runner.getCommandLine().getSubcommands().values())
                 .hasSize(1)
                 .haveExactly(1, new Condition<>(e -> {
@@ -102,8 +103,8 @@ public class PicocliAutoConfigurationTest {
                 .flatExtracting(extractor)
                 .hasSize(2)
                 .haveExactly(1, new Condition<>(e -> {
-                	Class clazz = NestedCommandConfiguration.Level0Command.Level1Command.class;
-                	return e.getCommand().getClass().equals(clazz);
+                    Class clazz = NestedCommandConfiguration.Level0Command.Level1Command.class;
+                    return e.getCommand().getClass().equals(clazz);
                 }, "Class Level1Command"))
                 .haveExactly(1, new Condition<>(e -> {
                     Class clazz = NestedCommandConfiguration.Level0Command.Level1bCommand.class;
@@ -119,18 +120,18 @@ public class PicocliAutoConfigurationTest {
                     Class clazz = NestedCommandConfiguration.Level0Command.Level1Command.Level2Command.class;
                     return e.getCommand().getClass().equals(clazz);
                 }, "Class Level2Command"));
-        
     }
 
-	private void logCommandTree(CommandLine current) {
-		for(String command : current.getSubcommands().keySet()) {
-        	CommandLine subCommand = current.getSubcommands().get(command);
-        	System.out.println("current command: " + current.getCommandName() + " sub command: " + subCommand.getCommandName());
-        	this.logCommandTree(subCommand);
+    private void logCommandTree(CommandLine current) {
+        for (String command : current.getSubcommands().keySet()) {
+            CommandLine subCommand = current.getSubcommands().get(command);
+            System.out.println(
+                    "current command: " + current.getCommandName() + " sub command: " + subCommand.getCommandName());
+            this.logCommandTree(subCommand);
         }
-	}
+    }
 
-	@Test(expected = RuntimeException.class) 
+    @Test(expected = RuntimeException.class)
     public void autoConfiguration_MultipleMainCommands_RandomUses() {
         load(MainCommandsConflictConfiguration.class);
     }
@@ -150,6 +151,30 @@ public class PicocliAutoConfigurationTest {
 
         assertThat(runner.getCommandLine().getSeparator()).isEqualTo("¯\\_(ツ)_/¯");
         assertThat(runner.getCommandLine().getSubcommands()).containsKeys("¯\\_(ツ)_/¯");
+    }
+
+    @Test
+    public void autoConfiguration_WithSubCommandsParameter_GetBeanIfExists() {
+        load(SubCommandConfiguration.class);
+        PicocliCommandLineRunner runner = context.getBean(PicocliCommandLineRunner.class);
+
+        assertThat(runner.getCommandLine().getSubcommands().get("basic").getSubcommands().values())
+                .isNotEmpty()
+                .extracting(CommandLine::getCommand)
+                .allMatch(c -> c instanceof SubCommandConfiguration.DummyBeanCommand)
+                .allMatch(c -> ((SubCommandConfiguration.DummyBeanCommand) c).getDummyBean() != null);
+    }
+
+    @Test
+    public void autoConfiguration_WithSubCommandsParameterAndNested_OnlyOneCommand() {
+        load(SubSubCommandConfiguration.class);
+        PicocliCommandLineRunner runner = context.getBean(PicocliCommandLineRunner.class);
+
+        assertThat(runner.getCommandLine().getSubcommands().get("basic").getSubcommands().values())
+                .hasSize(1)
+                .extracting(CommandLine::getCommand)
+                .allMatch(c -> c instanceof SubSubCommandConfiguration.BasicCommand.NestedSubCommand)
+                .allMatch(c -> ((SubSubCommandConfiguration.BasicCommand.NestedSubCommand) c).getDummyBean() != null);
     }
 
     @Configuration
@@ -248,6 +273,109 @@ public class PicocliAutoConfigurationTest {
 
         @Command
         static class BasicCommand {}
+    }
+
+    @Configuration
+    static class SubCommandConfiguration {
+        @Bean
+        DummyBean dummyBean() {
+            return new DummyBean("¯\\_(ツ)_/¯");
+        }
+
+        static class DummyBean {
+            private String title;
+
+            public DummyBean(String title) {
+                this.title = title;
+            }
+
+            public String getTitle() {
+                return title;
+            }
+        }
+
+        @Component
+        @Command(name = "basic",
+                subcommands = { ConstructorInjectionSubCommand.class, SetterInjectionSubCommand.class })
+        static class BasicCommand {
+
+            @Component
+            @Command(name = "sub3")
+            static class NestedSubCommand implements DummyBeanCommand {
+                @Autowired
+                private DummyBean dummyBean;
+
+                public DummyBean getDummyBean() {
+                    return dummyBean;
+                }
+            }
+        }
+
+        interface DummyBeanCommand {
+            DummyBean getDummyBean();
+        }
+
+        @Component
+        @Command(name = "sub1")
+        static class ConstructorInjectionSubCommand implements DummyBeanCommand {
+            private final DummyBean dummyBean;
+
+            public ConstructorInjectionSubCommand(DummyBean dummyBean) {
+                this.dummyBean = dummyBean;
+            }
+
+            public DummyBean getDummyBean() {
+                return dummyBean;
+            }
+        }
+
+        @Component
+        @Command(name = "sub2")
+        static class SetterInjectionSubCommand implements DummyBeanCommand {
+            @Autowired
+            private DummyBean dummyBean;
+
+            public DummyBean getDummyBean() {
+                return dummyBean;
+            }
+        }
+    }
+
+    @Configuration
+    static class SubSubCommandConfiguration {
+        @Bean
+        DummyBean dummyBean() {
+            return new DummyBean("¯\\_(ツ)_/¯");
+        }
+
+        static class DummyBean {
+            private String title;
+
+            public DummyBean(String title) {
+                this.title = title;
+            }
+
+            public String getTitle() {
+                return title;
+            }
+        }
+
+        @Component
+        @Command(name = "basic",
+                subcommands = { BasicCommand.NestedSubCommand.class })
+        static class BasicCommand {
+
+            @Component
+            @Command(name = "sub3")
+            static class NestedSubCommand {
+                @Autowired
+                private DummyBean dummyBean;
+
+                public DummyBean getDummyBean() {
+                    return dummyBean;
+                }
+            }
+        }
     }
 
     private void load(Class<?>... configs) {
