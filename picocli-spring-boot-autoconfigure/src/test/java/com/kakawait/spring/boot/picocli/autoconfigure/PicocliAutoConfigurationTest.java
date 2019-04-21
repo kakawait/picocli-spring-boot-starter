@@ -1,5 +1,12 @@
 package com.kakawait.spring.boot.picocli.autoconfigure;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.matchesPattern;
+
+import java.util.Collection;
+import java.util.regex.Pattern;
+
 import org.assertj.core.api.Condition;
 import org.assertj.core.api.iterable.Extractor;
 import org.junit.After;
@@ -11,15 +18,9 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Component;
+
 import picocli.CommandLine;
-
-import java.util.Collection;
-import java.util.regex.Pattern;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.hamcrest.Matchers.matchesPattern;
-import static picocli.CommandLine.Command;
+import picocli.CommandLine.Command;
 
 /**
  * @author Thibaud Leprêtre
@@ -58,7 +59,8 @@ public class PicocliAutoConfigurationTest {
         load(SimpleConfiguration.class);
         PicocliCommandLineRunner runner = context.getBean(PicocliCommandLineRunner.class);
 
-        assertThat(runner.getCommandLine().getCommand()).isInstanceOf(HelpAwarePicocliCommand.class);
+        Object command = runner.getCommandLine().getCommand();
+        assertThat(command).isInstanceOf(HelpAwarePicocliCommand.class);
 
         runner.run("-h");
 
@@ -74,7 +76,7 @@ public class PicocliAutoConfigurationTest {
 
         assertThat(runner.getCommandLine().getSubcommands().values())
                 .hasSameSizeAs(commands)
-                .extracting("interpreter.command")
+                .extractingResultOf("getCommand")
                 .containsExactlyElementsOf(commands)
                 .doNotHave(new Condition<>(SimpleConfiguration.NoBeanCommand.class::isInstance, "NoBeanCommand"));
     }
@@ -86,8 +88,11 @@ public class PicocliAutoConfigurationTest {
         Collection<Object> commands = context.getBeansWithAnnotation(Command.class).values();
 
         Extractor<CommandLine, Collection<CommandLine>> extractor = input -> input.getSubcommands().values();
-
         assertThat(commands).hasSize(5);
+        
+        CommandLine current = runner.getCommandLine();
+        this.logCommandTree(current);
+        
         assertThat(runner.getCommandLine().getSubcommands().values())
                 .hasSize(1)
                 .haveExactly(1, new Condition<>(e -> {
@@ -97,8 +102,8 @@ public class PicocliAutoConfigurationTest {
                 .flatExtracting(extractor)
                 .hasSize(2)
                 .haveExactly(1, new Condition<>(e -> {
-                    Class clazz = NestedCommandConfiguration.Level0Command.Level1Command.class;
-                    return e.getCommand().getClass().equals(clazz);
+                	Class clazz = NestedCommandConfiguration.Level0Command.Level1Command.class;
+                	return e.getCommand().getClass().equals(clazz);
                 }, "Class Level1Command"))
                 .haveExactly(1, new Condition<>(e -> {
                     Class clazz = NestedCommandConfiguration.Level0Command.Level1bCommand.class;
@@ -114,18 +119,20 @@ public class PicocliAutoConfigurationTest {
                     Class clazz = NestedCommandConfiguration.Level0Command.Level1Command.Level2Command.class;
                     return e.getCommand().getClass().equals(clazz);
                 }, "Class Level2Command"));
+        
     }
 
-    @Test
+	private void logCommandTree(CommandLine current) {
+		for(String command : current.getSubcommands().keySet()) {
+        	CommandLine subCommand = current.getSubcommands().get(command);
+        	System.out.println("current command: " + current.getCommandName() + " sub command: " + subCommand.getCommandName());
+        	this.logCommandTree(subCommand);
+        }
+	}
+
+	@Test(expected = RuntimeException.class) 
     public void autoConfiguration_MultipleMainCommands_RandomUses() {
         load(MainCommandsConflictConfiguration.class);
-        PicocliCommandLineRunner runner = context.getBean(PicocliCommandLineRunner.class);
-
-        assertThat(runner.getCommandLine())
-                .is(new Condition<>(
-                        c -> c.getCommand() instanceof MainCommandsConflictConfiguration.MainCommand2,
-                        "Class MainCommand2"));
-        assertThat(runner.getCommandLine().getSubcommands()).hasSize(0);
     }
 
     @Test

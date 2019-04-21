@@ -39,7 +39,7 @@ public class PicocliCommandLineRunner implements CommandLineRunner {
             cli.usage(System.err, Ansi.AUTO);
             return;
         }
-        if (isHelpRequested(cli.getCommand())) {
+        if (isHelpRequested((Object) cli.getCommand())) {
             cli.usage(System.out, Ansi.AUTO);
             return;
         }

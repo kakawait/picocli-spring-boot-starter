@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.kakawait</groupId>
     <artifactId>picocli-spring-boot-autoconfigure</artifactId>
-    <version>0.2.0</version>
+    <version>2.0.7-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>Picocli spring boot autoconfigure</name>
@@ -41,9 +41,9 @@
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
 
-        <spring-boot.version>1.5.4.RELEASE</spring-boot.version>
+        <spring-boot.version>2.0.7.RELEASE</spring-boot.version>
 
-        <picocli.version>0.9.8</picocli.version>
+        <picocli.version>3.9.1</picocli.version>
         <slf4j-api.version>1.7.25</slf4j-api.version>
 
         <assertj-core.version>3.8.0</assertj-core.version>
@@ -81,8 +81,19 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-            <version>${slf4j-api.version}</version>
         </dependency>
+
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-classic</artifactId>
+			<scope>test</scope>
+		</dependency>
+	
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-core</artifactId>
+			<scope>test</scope>
+		</dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -142,7 +153,7 @@
         <profile>
             <id>release</id>
             <properties>
-                <gpg.executable>gpg2</gpg.executable>
+                <gpg.executable>gpg</gpg.executable>
             </properties>
             <build>
                 <plugins>

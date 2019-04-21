@@ -57,7 +57,7 @@ public class PicocliCommandLineRunnerTest {
 
     @Test
     public void run_ExceptionDuringParsing_PrintUsageAndStop() throws Exception {
-        when(cli.parse(any())).thenThrow(new ParameterException("Error when parsing"));
+        when(cli.parse(any())).thenThrow(new ParameterException(cli, "Error when parsing"));
 
         runner.run("parsing error or something else");
 
