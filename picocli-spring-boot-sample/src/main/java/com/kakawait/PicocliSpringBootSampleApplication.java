@@ -182,7 +182,7 @@ public class PicocliSpringBootSampleApplication {
     }
 
     @Component
-    @Command(name = "flyway")
+    @Command(name = "flyway", subcommands = { RepairCommand.class })
     static class FlywayCommand extends HelpAwareContainerPicocliCommand {
 
         @Component
@@ -200,20 +200,20 @@ public class PicocliSpringBootSampleApplication {
                 flyway.migrate();
             }
         }
+    }
 
-        @Component
-        @Command(name = "repair")
-        static class RepairCommand implements Runnable {
-            private final Flyway flyway;
+    @Component
+    @Command(name = "repair")
+    static class RepairCommand implements Runnable {
+        private final Flyway flyway;
 
-            public RepairCommand(Flyway flyway) {
-                this.flyway = flyway;
-            }
+        public RepairCommand(Flyway flyway) {
+            this.flyway = flyway;
+        }
 
-            @Override
-            public void run() {
-                flyway.repair();
-            }
+        @Override
+        public void run() {
+            flyway.repair();
         }
     }
 

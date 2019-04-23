@@ -2,12 +2,13 @@ package com.kakawait.spring.boot.picocli.autoconfigure;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -42,6 +43,12 @@ import picocli.CommandLine.Command;
 class PicocliAutoConfiguration {
 
     @Bean
+    @ConditionalOnMissingBean(CommandLine.IFactory.class)
+    CommandLine.IFactory applicationAwarePicocliFactory(ApplicationContext applicationContext) {
+        return new ApplicationContextAwarePicocliFactory(applicationContext);
+    }
+
+    @Bean
     @ConditionalOnMissingBean(PicocliCommandLineRunner.class)
     @ConditionalOnBean(CommandLine.class)
     CommandLineRunner picocliCommandLineRunner(CommandLine cli) {
@@ -52,7 +59,13 @@ class PicocliAutoConfiguration {
     @Conditional(CommandCondition.class)
     static class CommandlineConfiguration {
 
-        private final Logger logger = LoggerFactory.getLogger(CommandlineConfiguration.class);
+        private static final Logger logger = LoggerFactory.getLogger(CommandlineConfiguration.class);
+
+        private final CommandLine.IFactory applicationAwarePicocliFactory;
+
+        public CommandlineConfiguration(CommandLine.IFactory applicationAwarePicocliFactory) {
+            this.applicationAwarePicocliFactory = applicationAwarePicocliFactory;
+        }
 
         @Bean
         CommandLine picocliCommandLine(ApplicationContext applicationContext) {
@@ -60,11 +73,11 @@ class PicocliAutoConfiguration {
             List<Object> mainCommands = getMainCommands(commands);
             Object mainCommand = mainCommands.isEmpty() ? new HelpAwarePicocliCommand() {} : mainCommands.get(0);
             if (mainCommands.size() > 1) {
-                throw new RuntimeException("Multiple mains command founds: " + Arrays.asList(mainCommands));
+                throw new RuntimeException("Multiple mains command founds: " + Collections.singletonList(mainCommands));
             }
             commands.removeAll(mainCommands);
 
-            CommandLine cli = new CommandLine(mainCommand);
+            CommandLine cli = new CommandLine(mainCommand, applicationAwarePicocliFactory);
             registerCommands(cli, commands);
 
             applicationContext.getBeansOfType(PicocliConfigurer.class).values().forEach(c -> c.configure(cli));
@@ -161,26 +174,24 @@ class PicocliAutoConfiguration {
                 }
                 
                 if (children.isEmpty()) {
-                	if(!current.getSubcommands().containsKey(commandName)) {
-                		current.addSubcommand(commandName, command);
-                	}
-                } else {
-                    CommandLine sub = null;
-                    if(!current.getSubcommands().containsKey(commandName)){
-                    	sub = new CommandLine(command);
-                    	current.addSubcommand(commandName, sub);
+                    if (!current.getSubcommands().containsKey(commandName)) {
+                        current.addSubcommand(commandName, command);
                     }
-                    else {
-                    	// get the reference of subCommands from current, instead of creating new one
-                    	sub = current.getSubcommands().get(commandName);
+                } else {
+                    CommandLine sub;
+                    if (!current.getSubcommands().containsKey(commandName)) {
+                        sub = new CommandLine(command, applicationAwarePicocliFactory);
+                        current.addSubcommand(commandName, sub);
+                    } else {
+                        // get the reference of subCommands from current, instead of creating new one
+                        sub = current.getSubcommands().get(commandName);
                     }
                     
                     for (Object child : children) {
-                    	String childCommandName = getCommandName(child);
-                    	if(!sub.getSubcommands().containsKey(childCommandName)) {
-                    		sub.addSubcommand(childCommandName, new CommandLine(child));
-                    	}
-                    	
+                        String childCommandName = getCommandName(child);
+                        if (!sub.getSubcommands().containsKey(childCommandName)) {
+                            sub.addSubcommand(childCommandName, new CommandLine(child, applicationAwarePicocliFactory));
+                        }
                     }
                     current = sub;
                 }
@@ -220,7 +231,7 @@ class PicocliAutoConfiguration {
 
                 Node node = (Node) o;
 
-                return clazz != null ? clazz.equals(node.clazz) : node.clazz == null;
+                return Objects.equals(clazz, node.clazz);
             }
 
             @Override
@@ -228,18 +239,18 @@ class PicocliAutoConfiguration {
                 return clazz != null ? clazz.hashCode() : 0;
             }
 
-			@Override
-			public String toString() {
-				StringBuilder builder = new StringBuilder();
-				builder.append("Node [clazz=");
-				builder.append(clazz);
-				builder.append(", object=");
-				builder.append(object);
-				builder.append(", parent=");
-				builder.append(parent);
-				builder.append("]");
-				return builder.toString();
-			}
+            @Override
+            public String toString() {
+                StringBuilder builder = new StringBuilder();
+                builder.append("Node [clazz=");
+                builder.append(clazz);
+                builder.append(", object=");
+                builder.append(object);
+                builder.append(", parent=");
+                builder.append(parent);
+                builder.append("]");
+                return builder.toString();
+            }
         }
     }
 
