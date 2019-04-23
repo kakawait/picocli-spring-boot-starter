@@ -2,7 +2,7 @@
 
 [![Travis](https://img.shields.io/travis/kakawait/picocli-spring-boot-starter.svg)](https://travis-ci.org/kakawait/picocli-spring-boot-starter)
 [![SonarQube Coverage](https://img.shields.io/sonar/https/sonarcloud.io/com.kakawait%3Apicocli-spring-boot-starter-parent/coverage.svg)](https://sonarcloud.io/component_measures?id=com.kakawait%3Apicocli-spring-boot-starter-parent&metric=coverage)
-[![Maven Central](https://img.shields.io/maven-central/v/com.kakawait/picocli-spring-boot-starter.svg)](https://search.maven.org/#artifactdetails%7Ccom.kakawait%7Cpicocli-spring-boot-starter%7C0.2.0%7Cjar)
+[![Maven Central](https://img.shields.io/maven-central/v/com.kakawait/picocli-spring-boot-starter.svg)](https://search.maven.org/#artifactdetails%7Ccom.kakawait%7Cpicocli-spring-boot-starter%7C1.0.0-beta-1%7Cjar)
 [![license](https://img.shields.io/github/license/kakawait/picocli-spring-boot-starter.svg)](https://github.com/kakawait/picocli-spring-boot-starter/blob/master/LICENSE.md)
 [![Twitter Follow](https://img.shields.io/twitter/follow/thibaudlepretre.svg?style=social&label=%40thibaudlepretre)](https://twitter.com/intent/follow?screen_name=thibaudlepretre)
 
@@ -25,7 +25,7 @@ Add the Spring boot starter to your project
 <dependency>
   <groupId>com.kakawait</groupId>
   <artifactId>picocli-spring-boot-starter</artifactId>
-  <version>0.2.0</version>
+  <version>1.0.0-beta-1</version>
 </dependency>
 ```
 
@@ -117,9 +117,66 @@ But the following example will not be candidate for _Main_ command
 class MainCommand {}
 ```
 
-#### Nested sub-commands using beans
+#### Nested sub-commands 
 
-Picocli allows [_nested sub-commands_](http://picocli.info/#_nested_sub_subcommands), in order to describe a _nested sub-command_, starter is offering you nested classes scanning capability.
+Picocli allows [_nested sub-commands_](http://picocli.info/#_nested_sub_subcommands), in order to describe a _nested sub-command_, starter is offering two ways to describe your structure.
+
+Please refer to next points to see how to construct this following command line application using both way:
+
+```
+Commands:
+   flyway [-h, --help]
+     migrate
+     repair
+```
+
+`java -jar <name>.jar flyway migrate` will execute _Flyway_ migration.
+
+You can mix methods but is not recommended!
+
+##### Using `subCommands` from `@Command` annotation
+
+```java
+@Component
+@Command(name = "flyway", subCommands = { MigrateCommand.class, RepairCommand.class })
+class FlywayCommand extends HelpAwareContainerPicocliCommand {}
+
+@Component
+@Command(name = "migrate")
+class MigrateCommand implements Runnable {
+
+    private final Flyway flyway;
+
+    public MigrateCommand(Flyway flyway) {
+        this.flyway = flyway;
+    }
+
+    @Override
+    public void run() {
+        flyway.migrate();
+    }
+}
+
+@Component
+@Command(name = "repair")
+class RepairCommand implements Runnable {
+    private final Flyway flyway;
+
+    public RepairCommand(Flyway flyway) {
+        this.flyway = flyway;
+    }
+
+    @Override
+    public void run() {
+        flyway.repair();
+    }
+}
+```
+
+By default starter is providing a custom implementation [`ApplicationContextAwarePicocliFactory`](picocli-spring-boot-autoconfigure/src/main/java/com/kakawait/spring/boot/picocli/autoconfigure/ApplicationContextAwarePicocliFactory.java) of [`CommandLine.IFactory`](https://picocli.info/apidocs/picocli/CommandLine.IFactory.html) that will delegate instance creation to _Spring_ `ApplicationContext` in order to load bean if exists.
+**ATTENTION** If subCommand is not a defined bean, [`ApplicationContextAwarePicocliFactory`](picocli-spring-boot-autoconfigure/src/main/java/com/kakawait/spring/boot/picocli/autoconfigure/ApplicationContextAwarePicocliFactory.java) will only instanciate class without any _autowiring_ capability.
+
+##### Using java nested class hierarchy
 
 That means, if you're defining **bean** structure like following:
 
@@ -161,20 +218,9 @@ class FlywayCommand extends HelpAwareContainerPicocliCommand {
 }
 ```
 
-Will generate command line 
-
-```
-Commands:
-   flyway [-h, --help]
-     migrate
-     repair
-```
-
-Thus `java -jar <name>.jar flyway migrate` will execute _Flyway_ migration.
-
 **ATTENTION** every classes must be a bean (`@Component`) with `@Command` annotation without forgetting to file `name` attribute.
 
-There is **no limitation** about nesting level.
+Otherwise, there is **no limitation** about nesting level.
 
 ### Additional configuration
 

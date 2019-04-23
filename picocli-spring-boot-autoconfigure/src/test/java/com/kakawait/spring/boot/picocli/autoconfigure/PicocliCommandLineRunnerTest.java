@@ -2,6 +2,8 @@ package com.kakawait.spring.boot.picocli.autoconfigure;
 
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.annotation.AnnotationDescription;
+import net.bytebuddy.dynamic.loading.ClassInjector;
+import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
 import net.bytebuddy.dynamic.scaffold.subclass.ConstructorStrategy;
 import org.junit.Before;
 import org.junit.Rule;
@@ -14,7 +16,9 @@ import org.springframework.boot.test.rule.OutputCapture;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -57,7 +61,7 @@ public class PicocliCommandLineRunnerTest {
 
     @Test
     public void run_ExceptionDuringParsing_PrintUsageAndStop() throws Exception {
-        when(cli.parse(any())).thenThrow(new ParameterException("Error when parsing"));
+        when(cli.parse(any())).thenThrow(new ParameterException(cli, "Error when parsing"));
 
         runner.run("parsing error or something else");
 
@@ -312,12 +316,36 @@ public class PicocliCommandLineRunnerTest {
     }
 
     private <T> Class<? extends T> make(String commandName, Class<T> type) {
-        return new ByteBuddy()
-                .subclass(type, ConstructorStrategy.Default.IMITATE_SUPER_CLASS)
-                .annotateType(getCommandAnnotationDescription(commandName))
-                .make()
-                .load(getClass().getClassLoader())
-                .getLoaded();
+        try {
+            return new ByteBuddy()
+                    .subclass(type, ConstructorStrategy.Default.IMITATE_SUPER_CLASS)
+                    .annotateType(getCommandAnnotationDescription(commandName))
+                    .make()
+                    .load(getClass().getClassLoader(), getClassLoadingStrategy(type))
+                    .getLoaded();
+        } catch (Exception e) {
+            throw new RuntimeException("Unable to generate dynamic class", e);
+        }
+    }
+
+    private ClassLoadingStrategy<ClassLoader> getClassLoadingStrategy(Class targetClass)
+            throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        ClassLoadingStrategy<ClassLoader> strategy;
+        if (ClassInjector.UsingLookup.isAvailable()) {
+            Class<?> methodHandles = Class.forName("java.lang.invoke.MethodHandles");
+            Object lookup = methodHandles.getMethod("lookup").invoke(null);
+            Method privateLookupIn = methodHandles.getMethod("privateLookupIn",
+                    Class.class,
+                    Class.forName("java.lang.invoke.MethodHandles$Lookup"));
+            Object privateLookup = privateLookupIn.invoke(null, targetClass, lookup);
+            strategy = ClassLoadingStrategy.UsingLookup.of(privateLookup);
+        } else if (ClassInjector.UsingReflection.isAvailable()) {
+            strategy = ClassLoadingStrategy.Default.INJECTION;
+        } else {
+            throw new IllegalStateException("No code generation strategy available");
+        }
+
+        return strategy;
     }
 
     private static class DelegateRunnable implements Runnable {

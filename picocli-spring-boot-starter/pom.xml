@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.kakawait</groupId>
     <artifactId>picocli-spring-boot-starter</artifactId>
-    <version>0.2.0</version>
+    <version>1.0.0-beta-1</version>
     <packaging>jar</packaging>
 
     <name>Picocli spring boot starter</name>
@@ -41,6 +41,8 @@
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
 
+        <spring-boot.version>2.1.4.RELEASE</spring-boot.version>
+
         <maven-source-plugin.version>3.0.1</maven-source-plugin.version>
         <maven-javadoc-plugin.version>2.10.4</maven-javadoc-plugin.version>
         <maven-gpg-plugin.version>1.6</maven-gpg-plugin.version>
@@ -48,11 +50,11 @@
     </properties>
 
     <dependencyManagement>
-        <dependencies> <!-- The parent should provide all that -->
+        <dependencies>
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
-                <version>1.5.4.RELEASE</version>
+                <version>${spring-boot.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -90,7 +92,7 @@
         <profile>
             <id>release</id>
             <properties>
-                <gpg.executable>gpg2</gpg.executable>
+                <gpg.executable>gpg</gpg.executable>
             </properties>
             <build>
                 <plugins>

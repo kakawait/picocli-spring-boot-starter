@@ -1,10 +1,20 @@
 package com.kakawait.spring.boot.picocli.autoconfigure;
 
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionMessage;
 import org.springframework.boot.autoconfigure.condition.ConditionOutcome;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -20,18 +30,9 @@ import org.springframework.context.annotation.ConfigurationCondition;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.type.AnnotatedTypeMetadata;
 import org.springframework.util.ReflectionUtils;
+
 import picocli.CommandLine;
-
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
-import static picocli.CommandLine.Command;
+import picocli.CommandLine.Command;
 
 /**
  * @author Thibaud Leprêtre
@@ -40,6 +41,12 @@ import static picocli.CommandLine.Command;
 @ConditionalOnClass(CommandLine.class)
 @Import(PicocliAutoConfiguration.CommandlineConfiguration.class)
 class PicocliAutoConfiguration {
+
+    @Bean
+    @ConditionalOnMissingBean(CommandLine.IFactory.class)
+    CommandLine.IFactory applicationAwarePicocliFactory(ApplicationContext applicationContext) {
+        return new ApplicationContextAwarePicocliFactory(applicationContext);
+    }
 
     @Bean
     @ConditionalOnMissingBean(PicocliCommandLineRunner.class)
@@ -52,7 +59,13 @@ class PicocliAutoConfiguration {
     @Conditional(CommandCondition.class)
     static class CommandlineConfiguration {
 
-        private final Logger logger = LoggerFactory.getLogger(CommandlineConfiguration.class);
+        private static final Logger logger = LoggerFactory.getLogger(CommandlineConfiguration.class);
+
+        private final CommandLine.IFactory applicationAwarePicocliFactory;
+
+        public CommandlineConfiguration(CommandLine.IFactory applicationAwarePicocliFactory) {
+            this.applicationAwarePicocliFactory = applicationAwarePicocliFactory;
+        }
 
         @Bean
         CommandLine picocliCommandLine(ApplicationContext applicationContext) {
@@ -60,11 +73,11 @@ class PicocliAutoConfiguration {
             List<Object> mainCommands = getMainCommands(commands);
             Object mainCommand = mainCommands.isEmpty() ? new HelpAwarePicocliCommand() {} : mainCommands.get(0);
             if (mainCommands.size() > 1) {
-                logger.warn("Multiple mains command founds [{}], selected first one {}", mainCommands, mainCommand);
+                throw new RuntimeException("Multiple mains command founds: " + Collections.singletonList(mainCommands));
             }
             commands.removeAll(mainCommands);
 
-            CommandLine cli = new CommandLine(mainCommand);
+            CommandLine cli = new CommandLine(mainCommand, applicationAwarePicocliFactory);
             registerCommands(cli, commands);
 
             applicationContext.getBeansOfType(PicocliConfigurer.class).values().forEach(c -> c.configure(cli));
@@ -159,13 +172,26 @@ class PicocliAutoConfiguration {
                 } else if (node.getParent() == null) {
                     current = cli;
                 }
+                
                 if (children.isEmpty()) {
-                    current.addSubcommand(commandName, command);
+                    if (!current.getSubcommands().containsKey(commandName)) {
+                        current.addSubcommand(commandName, command);
+                    }
                 } else {
-                    CommandLine sub = new CommandLine(command);
-                    current.addSubcommand(commandName, sub);
+                    CommandLine sub;
+                    if (!current.getSubcommands().containsKey(commandName)) {
+                        sub = new CommandLine(command, applicationAwarePicocliFactory);
+                        current.addSubcommand(commandName, sub);
+                    } else {
+                        // get the reference of subCommands from current, instead of creating new one
+                        sub = current.getSubcommands().get(commandName);
+                    }
+                    
                     for (Object child : children) {
-                        sub.addSubcommand(getCommandName(child), new CommandLine(child));
+                        String childCommandName = getCommandName(child);
+                        if (!sub.getSubcommands().containsKey(childCommandName)) {
+                            sub.addSubcommand(childCommandName, new CommandLine(child, applicationAwarePicocliFactory));
+                        }
                     }
                     current = sub;
                 }
@@ -205,12 +231,25 @@ class PicocliAutoConfiguration {
 
                 Node node = (Node) o;
 
-                return clazz != null ? clazz.equals(node.clazz) : node.clazz == null;
+                return Objects.equals(clazz, node.clazz);
             }
 
             @Override
             public int hashCode() {
                 return clazz != null ? clazz.hashCode() : 0;
+            }
+
+            @Override
+            public String toString() {
+                StringBuilder builder = new StringBuilder();
+                builder.append("Node [clazz=");
+                builder.append(clazz);
+                builder.append(", object=");
+                builder.append(object);
+                builder.append(", parent=");
+                builder.append(parent);
+                builder.append("]");
+                return builder.toString();
             }
         }
     }
