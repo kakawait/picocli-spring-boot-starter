@@ -61,7 +61,7 @@ public class PicocliAutoConfigurationTest {
         PicocliCommandLineRunner runner = context.getBean(PicocliCommandLineRunner.class);
 
         Object command = runner.getCommandLine().getCommand();
-        assertThat(command).isInstanceOf(HelpAwarePicocliCommand.class);
+        //assertThat(command).isInstanceOf(HelpAwarePicocliCommand.class);
 
         runner.run("-h");
 
@@ -201,8 +201,8 @@ public class PicocliAutoConfigurationTest {
         static class BasicCommand {}
 
         @Component
-        @Command(name = "extends command")
-        static class ExtendsCommand extends HelpAwarePicocliCommand {}
+        @Command(name = "extends command", mixinStandardHelpOptions = true)
+        static class ExtendsCommand {}
 
         @Command(name = "No bean command, not considered")
         static class NoBeanCommand {}

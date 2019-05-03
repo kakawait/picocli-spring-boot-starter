@@ -1,8 +1,6 @@
 package com.kakawait;
 
 import com.google.common.base.CaseFormat;
-import com.kakawait.spring.boot.picocli.autoconfigure.ExitStatus;
-import com.kakawait.spring.boot.picocli.autoconfigure.HelpAwarePicocliCommand;
 import com.kakawait.spring.boot.picocli.autoconfigure.PicocliConfigurerAdapter;
 import org.flywaydb.core.Flyway;
 import org.slf4j.Logger;
@@ -16,8 +14,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import picocli.CommandLine;
-import picocli.CommandLine.Help.Ansi;
-import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
 import java.util.Map;
@@ -33,29 +29,25 @@ import static picocli.CommandLine.Command;
  *
  * <pre>
  * {@code
- * Usage: <main class> [-vh]
- *   -v, --version               display version info
- *   -h, --help                  Prints this help message and exits
+ * Usage: <main class> [-hV] [COMMAND]
+ *   -h, --help      Show this help message and exit.
+ *   -V, --version   Print version information and exit.
  * Commands:
- *   flyway [-h, --help]
- *     migrate
- *     repair
- *   greeting [-h, --help] [NAME]
- *   health [-h, --help]
- *     db
- *     disk-space
+ *   flyway
+ *   greeting
+ *   health
  * }
  * </pre>
  * Thus running following commands should output following:
  * <pre>
  * {@code
- * $> java -jar <name>.jar -v
- * 0.1.0
+ * $> java -jar <name>.jar -V
+ * version 1.0.0
  *
  * $> java -jar <name>.jar -h
- * Usage: <main class> [-vh]
- *   -v, --version               display version info
- *   -h, --help                  Prints this help message and exits
+ * Usage: <main class> [-hV] [COMMAND]
+ *  -h, --help      Show this help message and exit.
+ *  -V, --version   Print version information and exit.
  * Commands:
  *   flyway
  *   greeting
@@ -119,12 +111,12 @@ public class PicocliSpringBootSampleApplication {
 
         @Override
         public void configure(CommandLine cli) {
-            CommandLine healthCli = new CommandLine(new HelpAwareContainerPicocliCommand() {});
+            CommandLine healthCli = new CommandLine(new CommandLine.HelpCommand());
             for (Map.Entry<String, HealthIndicator> entry : healthIndicators.entrySet()) {
                 Matcher matcher = HEALTH_PATTERN.matcher(entry.getKey());
                 if (matcher.matches()) {
                     String name = CaseFormat.LOWER_CAMEL.to(CaseFormat.LOWER_HYPHEN, matcher.group(1));
-                    healthCli.addSubcommand(name, new PrintCommand(entry.getValue().health()));
+                    cli.addSubcommand(name, new PrintCommand(entry.getValue().health()));
                 } else {
                     logger.warn("Unable to determine a correct name for given indicator: \"{}\", skip it!",
                             entry.getKey());
@@ -149,24 +141,8 @@ public class PicocliSpringBootSampleApplication {
     }
 
     @Component
-    @Command
-    static class MainCommand extends HelpAwarePicocliCommand {
-        @Option(names = {"-v", "--version"}, description = "display version info")
-        boolean versionRequested;
-
-        @Override
-        public ExitStatus call() {
-            if (versionRequested) {
-                System.out.println("0.1.0");
-                return ExitStatus.TERMINATION;
-            }
-            return ExitStatus.OK;
-        }
-    }
-
-    @Component
-    @Command(name = "greeting")
-    static class GreetingCommand extends HelpAwarePicocliCommand {
+    @Command(name = "greeting", mixinStandardHelpOptions = true)
+    static class GreetingCommand implements Runnable {
 
         @Parameters(paramLabel = "NAME", description = "name", arity = "0..1")
         String name;
@@ -182,8 +158,8 @@ public class PicocliSpringBootSampleApplication {
     }
 
     @Component
-    @Command(name = "flyway", subcommands = { RepairCommand.class })
-    static class FlywayCommand extends HelpAwareContainerPicocliCommand {
+    @Command(name = "flyway", subcommands = { RepairCommand.class }, mixinStandardHelpOptions = true)
+    static class FlywayCommand {
 
         @Component
         @Command(name = "migrate")
@@ -214,18 +190,6 @@ public class PicocliSpringBootSampleApplication {
         @Override
         public void run() {
             flyway.repair();
-        }
-    }
-
-    @Command
-    private static abstract class HelpAwareContainerPicocliCommand extends HelpAwarePicocliCommand {
-        @Override
-        public ExitStatus call() {
-            if (getParsedCommands().get(getParsedCommands().size() - 1).getCommand().equals(this)) {
-                getContext().usage(System.out, Ansi.AUTO);
-                return ExitStatus.TERMINATION;
-            }
-            return ExitStatus.OK;
         }
     }
 
