@@ -46,7 +46,7 @@
         <picocli.version>0.9.8</picocli.version>
         <slf4j-api.version>1.7.25</slf4j-api.version>
 
-        <assertj-core.version>3.8.0</assertj-core.version>
+        <assertj-core.version>3.27.7</assertj-core.version>
         <java-hamcrest.version>2.0.0.0</java-hamcrest.version>
         <mockito-core.version>2.15.0</mockito-core.version>
 
